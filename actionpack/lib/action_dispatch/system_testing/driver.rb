@@ -30,6 +30,10 @@ module ActionDispatch
         setup
       end
 
+      def server_required?
+        @driver_type != :rack_test
+      end
+
       private
         def registerable?
           [:selenium, :cuprite, :rack_test, :playwright].include?(@driver_type)

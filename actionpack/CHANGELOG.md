@@ -1,3 +1,11 @@
+*   Add a Capybara-independent test server primitive for system tests.
+
+    System test setup can now start the Rails Rack application through an
+    internal in-process server, and `ActionDispatch::SystemTestCase` no longer
+    loads Capybara until a system test is actually used.
+
+    *Yusuke Iwaki*
+
 *   Add `config.action_dispatch.strict_accept_header` to stop forcing an
     HTML response when the `Accept` header contains the `*/*` wildcard.
 

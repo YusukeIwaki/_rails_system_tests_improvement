@@ -2,10 +2,6 @@
 
 # :markup: markdown
 
-gem "capybara", ">= 3.26"
-
-require "capybara/dsl"
-require "capybara/minitest"
 require "action_controller"
 require "action_dispatch/system_testing/driver"
 require "action_dispatch/system_testing/browser"
@@ -112,30 +108,37 @@ module ActionDispatch
   # any driver that is supported by Capybara is supported by system tests as long
   # as you include the required gems and files.
   class SystemTestCase < ActiveSupport::TestCase
-    include Capybara::DSL
-    include Capybara::Minitest::Assertions
     include SystemTesting::TestHelpers::SetupAndTeardown
     include SystemTesting::TestHelpers::ScreenshotHelper
 
     DEFAULT_HOST = "http://127.0.0.1"
 
+    class_attribute :driver, instance_accessor: false
+    class_attribute :application_started, instance_accessor: false, default: false
+    class_attribute :capybara_loaded, instance_accessor: false, default: false
+
     def initialize(*) # :nodoc:
       super
+      self.class.ensure_capybara_loaded!
       self.class.driven_by(:selenium) unless self.class.driver?
       self.class.driver.use
+      self.class.start_application
     end
 
     def self.start_application # :nodoc:
+      return if application_started
+
+      ensure_capybara_loaded!
+
       Capybara.app = Rack::Builder.new do
         map "/" do
           run Rails.application
         end
       end
 
-      SystemTesting::Server.new.run
+      SystemTesting::Server.new(app: Capybara.app, driver: driver).run
+      self.application_started = true
     end
-
-    class_attribute :driver, instance_accessor: false
 
     # System Test configuration options
     #
@@ -159,14 +162,32 @@ module ActionDispatch
       driver_options = { using: using, screen_size: screen_size, options: options }
 
       self.driver = SystemTesting::Driver.new(driver, **driver_options, &capabilities)
+      self.application_started = false
     end
 
     # Configuration for the System Test application server.
     #
     # By default this is localhost. This method allows the host and port to be specified manually.
     def self.served_by(host:, port:)
+      ensure_capybara_loaded!
+
       Capybara.server_host = host
       Capybara.server_port = port
+      self.application_started = false
+    end
+
+    def self.ensure_capybara_loaded! # :nodoc:
+      return if capybara_loaded
+
+      gem "capybara", ">= 3.26"
+
+      require "capybara/dsl"
+      require "capybara/minitest"
+
+      include Capybara::DSL
+      include Capybara::Minitest::Assertions
+
+      self.capybara_loaded = true
     end
 
     private
@@ -203,4 +224,3 @@ module ActionDispatch
 end
 
 ActiveSupport.run_load_hooks :action_dispatch_system_test_case, ActionDispatch::SystemTestCase
-ActionDispatch::SystemTestCase.start_application

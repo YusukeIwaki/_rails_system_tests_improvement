@@ -133,6 +133,7 @@ module ActionDispatch
     autoload :TestProcess
     autoload :TestRequest
     autoload :TestResponse
+    autoload :TestServer
     autoload :AssertionResponse
   end
 
