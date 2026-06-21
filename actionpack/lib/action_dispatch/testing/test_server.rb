@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "socket"
+require "net/http"
 require "timeout"
 
 module ActionDispatch
@@ -8,13 +9,16 @@ module ActionDispatch
     DEFAULT_HOST = "127.0.0.1"
     DEFAULT_WAIT = 5
     DEFAULT_PUMA_OPTIONS = { Threads: "0:4", workers: 0, daemon: false }.freeze
+    IDENTITY_PATH = "/__identity__"
 
     attr_reader :app, :host, :port
 
     def initialize(app:, host: DEFAULT_HOST, port: nil, server: :puma, server_options: {}, wait: DEFAULT_WAIT)
       @app = app
       @host = host
-      @port = port || find_available_port(host)
+      @port = port || AvailablePortFinder.new(host).find
+      @identity = "#{self.class.name}:#{object_id}"
+      @checker = Checker.new(host, @port, @identity)
       @server_name = server
       @server_options = server_options
       @wait = wait
@@ -43,7 +47,7 @@ module ActionDispatch
     end
 
     def running?
-      @server_thread&.alive? && responsive?
+      @server_thread&.alive? && @checker.responsive?
     end
 
     def base_url
@@ -52,7 +56,7 @@ module ActionDispatch
 
     private
       def run
-        resolved_server.run(app, **options) do |server|
+        resolved_server.run(wrapped_app, **options) do |server|
           @server = server
         end
       rescue Exception => error
@@ -66,6 +70,10 @@ module ActionDispatch
           Host: host,
           Port: port
         }.merge(@server_options)
+      end
+
+      def wrapped_app
+        @wrapped_app ||= IdentityMiddleware.new(app, @identity)
       end
 
       def resolved_server
@@ -92,7 +100,7 @@ module ActionDispatch
 
       def wait_until_ready
         Timeout.timeout(@wait) do
-          until responsive?
+          until @checker.responsive?
             raise @server_error if @server_error
 
             sleep 0.01
@@ -102,15 +110,6 @@ module ActionDispatch
         raise @server_error if @server_error
 
         raise
-      end
-
-      def responsive?
-        Socket.tcp(host, port, connect_timeout: 0.1) do |socket|
-          socket.close
-        end
-        true
-      rescue SystemCallError, IOError
-        false
       end
 
       def stop_server
@@ -132,10 +131,79 @@ module ActionDispatch
         @server_thread = nil
       end
 
-      def find_available_port(host)
-        TCPServer.open(host, 0) do |server|
-          server.addr[1]
+      class AvailablePortFinder
+        def initialize(host)
+          @host = host
         end
+
+        def find
+          server = TCPServer.new(@host, 0)
+          port = server.addr[1]
+          server.close
+          server = nil
+
+          # Some platforms can report a port that is only available on one
+          # resolved address. Verify the selected port can be rebound.
+          server = TCPServer.new(@host, port)
+          port
+        rescue Errno::EADDRINUSE
+          retry
+        ensure
+          server&.close unless server&.closed?
+        end
+      end
+
+      class IdentityMiddleware
+        def initialize(app, identity)
+          @app = app
+          @identity = identity
+        end
+
+        def call(env)
+          if env["PATH_INFO"] == IDENTITY_PATH
+            [200, { "Content-Type" => "text/plain" }, [@identity]]
+          else
+            @app.call(env)
+          end
+        end
+      end
+
+      class Checker
+        def initialize(host, port, identity)
+          @host = host
+          @port = port
+          @identity = identity
+        end
+
+        def responsive?
+          response = Net::HTTP.start(connect_host, @port, **http_options) do |http|
+            http.get(IDENTITY_PATH)
+          end
+
+          response.is_a?(Net::HTTPSuccess) && response.body == @identity
+        rescue SystemCallError, IOError, EOFError, Net::ReadTimeout, Net::OpenTimeout
+          false
+        end
+
+        private
+          def connect_host
+            case @host
+            when "0.0.0.0"
+              "127.0.0.1"
+            when "::"
+              "::1"
+            else
+              @host
+            end
+          end
+
+          def http_options
+            {
+              open_timeout: 0.1,
+              read_timeout: 0.1,
+              max_retries: 0
+            }
+          end
       end
 
       module PumaServer

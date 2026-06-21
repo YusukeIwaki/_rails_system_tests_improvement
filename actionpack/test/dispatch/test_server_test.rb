@@ -73,16 +73,28 @@ class TestServerTest < ActiveSupport::TestCase
   end
 
   test "serves a Rack app in a separate thread" do
+    requested_paths = []
     app = lambda do |env|
+      requested_paths << env["PATH_INFO"]
       [200, { "Content-Type" => "text/plain" }, ["Hello from #{env["PATH_INFO"]}"]]
     end
     server = ActionDispatch::TestServer.new(app: app, server: InProcessRackHandler)
 
     server.start
 
+    assert_empty requested_paths
     assert_predicate server, :running?
     assert_equal "Hello from /test", Net::HTTP.get(URI("#{server.base_url}/test"))
+    assert_equal ["/test"], requested_paths
   ensure
     server&.stop
+  end
+
+  test "finds an available port that can be rebound" do
+    port = ActionDispatch::TestServer::AvailablePortFinder.new("127.0.0.1").find
+
+    TCPServer.open("127.0.0.1", port) do |server|
+      assert_equal port, server.addr[1]
+    end
   end
 end
