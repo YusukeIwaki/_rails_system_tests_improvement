@@ -136,6 +136,7 @@ module ActionDispatch
     autoload :AssertionResponse
   end
 
+  autoload :EssentialSystemTestCase, "action_dispatch/essential_system_test_case"
   autoload :SystemTestCase, "action_dispatch/system_test_case"
 
   ##
