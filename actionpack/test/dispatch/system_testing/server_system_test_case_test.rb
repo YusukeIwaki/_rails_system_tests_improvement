@@ -16,6 +16,13 @@ class ServerSystemTestCaseTest < ActiveSupport::TestCase
   class MyApplicationSystemTestCase < ActionDispatch::ServerSystemTestCase
   end
 
+  class ExampleAdapter < ActionDispatch::SystemTesting::TestAdapter
+    global_helper(:adapter_name) { options.fetch(:name) }
+    helper(:adapter_page) { |adapter_name:| "#{adapter_name} page" }
+  end
+
+  ActionDispatch::SystemTesting::TestAdapters.register(:example, ExampleAdapter)
+
   def new_test_case
     Class.new(MyApplicationSystemTestCase) do
       def test_something
@@ -39,6 +46,80 @@ class ServerSystemTestCaseTest < ActiveSupport::TestCase
       assert_equal "http://rails-app:4000", instance.base_url
       assert_equal "http://rails-app:4000", instance.app_host
     end
+  end
+
+  test "testing_with installs an adapter and forwards its options" do
+    adapter = nil
+
+    with_test_session do
+      klass = new_test_case
+      klass.testing_with :example, name: "example"
+      adapter = klass.test_adapter
+      instance = klass.new("test_something")
+
+      instance.send(:before_setup)
+
+      assert_instance_of ExampleAdapter, adapter
+      assert_equal "example page", instance.adapter_page
+      instance.assert true
+
+      instance.send(:after_teardown)
+    end
+  ensure
+    adapter&.shutdown
+  end
+
+  test "testing_with looks up the Playwright adapter by name" do
+    klass = new_test_case
+
+    klass.testing_with :playwright, browser_type: :firefox
+
+    assert_instance_of ActionDispatch::SystemTesting::TestAdapters::PlaywrightAdapter, klass.test_adapter
+    assert_equal :firefox, klass.test_adapter.options[:browser_type]
+  ensure
+    klass&.test_adapter&.shutdown
+  end
+
+  test "testing_with looks up the Ferrum adapter by name" do
+    klass = new_test_case
+
+    klass.testing_with :ferrum, browser_options: { headless: false }
+
+    assert_instance_of ActionDispatch::SystemTesting::TestAdapters::FerrumAdapter, klass.test_adapter
+    assert_equal({ headless: false }, klass.test_adapter.options[:browser_options])
+  ensure
+    klass&.test_adapter&.shutdown
+  end
+
+  test "shuts down adapters created by testing_with" do
+    events = []
+    adapter_class = Class.new(ActionDispatch::SystemTesting::TestAdapter) do
+      global_helper :resource do
+        on_teardown { events << :closed }
+        :resource
+      end
+    end
+    ActionDispatch::SystemTesting::TestAdapters.register(:shutdown_example, adapter_class)
+    klass = new_test_case
+    klass.testing_with :shutdown_example
+    instance = klass.new("test_something")
+    instance.resource
+
+    ActionDispatch::ServerSystemTestCase.shutdown_all_test_adapters
+
+    assert_equal [:closed], events
+  ensure
+    klass&.test_adapter&.shutdown
+  end
+
+  test "testing_with leaves invalid adapter name errors to lookup" do
+    klass = new_test_case
+
+    error = assert_raises(ArgumentError) do
+      klass.testing_with ExampleAdapter
+    end
+
+    assert_equal "system test adapter name must be a String or Symbol", error.message
   end
 
   test "before_setup starts the test session" do

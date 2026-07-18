@@ -1759,76 +1759,106 @@ This is useful when you drive the browser with a tool that does not go through
 Capybara, such as [Ferrum](https://github.com/rubycdp/ferrum) or
 [Playwright](https://github.com/YusukeIwaki/playwright-ruby-client).
 
-To use it, inherit from `ActionDispatch::ServerSystemTestCase` in your
-`application_system_test_case.rb` and wire up your browser automation tool there,
-so that individual tests stay focused on the interaction being tested. The server
-binds to an available port on `0.0.0.0` by default, so you usually don't need to
-configure it. For example, with [Ferrum](https://github.com/rubycdp/ferrum),
-which speaks the Chrome DevTools Protocol directly:
+To use it, inherit from `ActionDispatch::ServerSystemTestCase` in
+`application_system_test_case.rb`. The server binds to an available port on
+`0.0.0.0` by default, so you usually don't need to configure it.
+
+#### Playwright
+
+The Playwright adapter requires the `playwright-ruby-client` gem and the
+Playwright npm package. Select it with `testing_with`:
 
 ```ruby
 require "test_helper"
-require "ferrum"
 
 class ApplicationSystemTestCase < ActionDispatch::ServerSystemTestCase
-  setup    { @browser = Ferrum::Browser.new }
-  teardown { @browser&.quit }
+  testing_with :playwright
 end
 ```
 
-Individual tests then only drive the page. URL helpers (`articles_url`,
-`new_article_url`, ...) are generated against the running server, so the host
-they produce points at the live application:
+The adapter starts one browser for the test run and provides a new
+`browser_context` and `page` for each test. Tests use Playwright's native API:
 
 ```ruby
 require "application_system_test_case"
 
 class ArticlesTest < ApplicationSystemTestCase
   test "creating an article" do
-    @browser.goto new_article_url # => http://127.0.0.1:<port>/articles/new
+    page.goto new_article_path
 
-    @browser.at_css("input[name='article[title]']").focus.type("Hello Rails")
-    @browser.at_css("textarea[name='article[body]']").focus.type("Body")
-    @browser.at_css("input[type=submit]").click
+    page.get_by_label("Title").fill("Hello Rails")
+    page.get_by_label("Body").fill("Body")
+    page.get_by_role("button", name: "Create Article").click
 
-    assert_includes @browser.body, "Hello Rails"
+    assert page.get_by_text("Hello Rails").visible?
   end
 end
 ```
 
-Any tool works the same way; only the `ApplicationSystemTestCase` wiring changes.
-With [Playwright](https://github.com/YusukeIwaki/playwright-ruby-client), for
-example, launch the browser once for the whole run and create a fresh context
-per test:
+The context uses the running server's `base_url`, so relative paths resolve
+against the Rails application. URL helpers (`articles_url`, `new_article_path`,
+...) also point at the running server.
+
+The adapter uses Chromium in headless mode and
+`./node_modules/.bin/playwright` by default. Options can select another browser
+or configure browser launch and context creation:
+
+```ruby
+class ApplicationSystemTestCase < ActionDispatch::ServerSystemTestCase
+  testing_with :playwright,
+    browser_type: :firefox,
+    headless: false,
+    browser_context_options: { locale: "ja-JP" }
+end
+```
+
+Set `PLAYWRIGHT_CLI_EXECUTABLE_PATH` to use another Playwright executable. To
+connect to a Playwright browser server, set `PLAYWRIGHT_WS_ENDPOINT` or pass
+`browser_server_endpoint_url` to `testing_with`.
+
+#### Ferrum
+
+The Ferrum adapter requires the `ferrum` gem and Chrome or Chromium. Select it
+with `testing_with`:
 
 ```ruby
 require "test_helper"
-require "playwright"
 
 class ApplicationSystemTestCase < ActionDispatch::ServerSystemTestCase
-  # Launch Playwright and the browser once for the whole run; a fresh
-  # browser context per test is enough to isolate one test from the next.
-  def self.browser
-    @browser ||= begin
-      execution = Playwright.create(playwright_cli_executable_path: "./node_modules/.bin/playwright")
-      at_exit { execution.stop }
-      execution.playwright.chromium.launch(headless: true)
-    end
-  end
-
-  setup do
-    @context = ApplicationSystemTestCase.browser.new_context(baseURL: base_url)
-    @page = @context.new_page
-  end
-
-  teardown { @context&.close }
+  testing_with :ferrum
 end
 ```
 
-with tests driving `@page`. Because the context is created with
-`baseURL: base_url`, relative paths resolve against the running server
-(`@page.goto new_article_path`, ...), and absolute URL helpers point at it too
-(`@page.goto new_article_url`, ...).
+The adapter starts one browser for the test run and provides a new isolated
+`browser_context` and `page` for each test. It sets Ferrum's `base_url` to the
+running Rails server, so both relative paths and URL helpers can be used:
+
+```ruby
+class ArticlesTest < ApplicationSystemTestCase
+  test "viewing an article" do
+    page.go_to article_path(articles(:welcome))
+
+    assert_equal "Welcome", page.at_css("h1").text
+  end
+end
+```
+
+Options in `browser_options` are passed to `Ferrum::Browser.new`, while
+`browser_context_options` are passed when creating each browser context:
+
+```ruby
+class ApplicationSystemTestCase < ActionDispatch::ServerSystemTestCase
+  testing_with :ferrum,
+    browser_options: {
+      headless: false,
+      browser_path: "/path/to/chrome",
+      timeout: 10
+    }
+end
+```
+
+Ferrum also reads `BROWSER_PATH`. To connect to a running Chrome instance,
+pass its remote debugging URL with `browser_options: { url: "http://chrome:9222" }`.
 
 When the browser needs to reach the application at a different URL than the bind
 address (for example when the test runs in a separate Docker container), set
@@ -1837,8 +1867,47 @@ address (for example when the test runs in a separate Docker container), set
 ```ruby
 class ApplicationSystemTestCase < ActionDispatch::ServerSystemTestCase
   served_by app_host: "http://rails-app:4000", port: 4000
+  testing_with :playwright
 end
 ```
+
+#### System Test Adapters
+
+A browser library can provide an adapter without implementing a Capybara driver
+or translating its browser API. Adapters inherit from
+`ActionDispatch::SystemTesting::TestAdapter`. A `global_helper` lives for the
+test run, while a `helper` lives for one test. Required keyword parameters make
+dependencies explicit:
+
+```ruby
+class MyBrowserAdapter < ActionDispatch::SystemTesting::TestAdapter
+  global_helper :browser do
+    browser = MyBrowser.launch
+    on_teardown { browser.close }
+    browser
+  end
+
+  helper :browser_context do |base_url:, browser:|
+    context = browser.new_context(base_url: base_url)
+    on_teardown { context.close }
+    context
+  end
+
+  helper :page do |browser_context:|
+    page = browser_context.new_page
+    on_teardown { page.close }
+    page
+  end
+end
+
+ActionDispatch::SystemTesting::TestAdapters.register(:my_browser, MyBrowserAdapter)
+```
+
+Applications can then select it with `testing_with :my_browser`. Helpers are
+initialized when first used. `on_teardown` callbacks run in reverse order, after
+each test for `helper` resources and after the test run for `global_helper`
+resources. A test helper can depend on a global helper, but a global helper
+cannot depend on a test helper.
 
 Test Helpers
 ------------

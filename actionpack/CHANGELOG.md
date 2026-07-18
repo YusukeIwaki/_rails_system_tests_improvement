@@ -16,8 +16,15 @@
     automation tools other than Capybara (Playwright, Ferrum, plain `Net::HTTP`,
     ...) can drive a real Rails server. It also supports a separate bind host
     and browser-facing app host, and reraises server-side application errors
-    during teardown. `ActionDispatch::SystemTestCase` remains the
-    Capybara-based default.
+    during teardown.
+
+    Browser libraries can provide a `SystemTesting::TestAdapter` selected with
+    `testing_with`. Adapters declare run-scoped resources with `global_helper`
+    and test-scoped resources with `helper`, including their dependencies and
+    teardown callbacks. The built-in Playwright and Ferrum adapters make
+    `browser`, `browser_context`, and `page` available with
+    `testing_with :playwright` or `testing_with :ferrum`.
+    `ActionDispatch::SystemTestCase` remains the Capybara-based default.
 
     *YusukeIwaki*
 
