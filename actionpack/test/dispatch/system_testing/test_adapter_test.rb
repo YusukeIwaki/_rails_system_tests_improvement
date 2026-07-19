@@ -115,16 +115,18 @@ class TestAdapterTest < ActiveSupport::TestCase
 
   test "circular helper dependencies raise a descriptive error" do
     adapter_class = Class.new(ActionDispatch::SystemTesting::TestAdapter) do
-      helper(:one) { |two:| two }
-      helper(:two) { |one:| one }
+      helper(:a) { |b:| b }
+      helper(:b) { |c:| c }
+      helper(:c) { |d:| d }
+      helper(:d) { |a:| a }
     end
     adapter = adapter_class.new
     adapter.install(TestCase)
     test_case = TestCase.new
     adapter.before_setup
 
-    error = assert_raises(ArgumentError) { test_case.one }
-    assert_equal "circular system test helper dependency: one -> two -> one", error.message
+    error = assert_raises(ArgumentError) { test_case.a }
+    assert_equal "circular system test helper dependency: a -> b -> c -> d -> a", error.message
   ensure
     adapter&.after_teardown if test_case
     adapter&.shutdown
