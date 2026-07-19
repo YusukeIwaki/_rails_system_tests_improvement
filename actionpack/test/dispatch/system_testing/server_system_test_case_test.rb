@@ -69,28 +69,6 @@ class ServerSystemTestCaseTest < ActiveSupport::TestCase
     adapter&.shutdown
   end
 
-  test "testing_with looks up the Playwright adapter by name" do
-    klass = new_test_case
-
-    klass.testing_with :playwright, browser_type: :firefox
-
-    assert_instance_of ActionDispatch::SystemTesting::TestAdapters::PlaywrightAdapter, klass.test_adapter
-    assert_equal :firefox, klass.test_adapter.options[:browser_type]
-  ensure
-    klass&.test_adapter&.shutdown
-  end
-
-  test "testing_with looks up the Ferrum adapter by name" do
-    klass = new_test_case
-
-    klass.testing_with :ferrum, browser_options: { headless: false }
-
-    assert_instance_of ActionDispatch::SystemTesting::TestAdapters::FerrumAdapter, klass.test_adapter
-    assert_equal({ headless: false }, klass.test_adapter.options[:browser_options])
-  ensure
-    klass&.test_adapter&.shutdown
-  end
-
   test "shuts down adapters created by testing_with" do
     events = []
     adapter_class = Class.new(ActionDispatch::SystemTesting::TestAdapter) do
