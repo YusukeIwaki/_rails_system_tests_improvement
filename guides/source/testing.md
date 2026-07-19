@@ -1925,10 +1925,10 @@ ActionDispatch::SystemTesting::TestAdapters.register(:my_browser, MyBrowserAdapt
 ```
 
 Applications can then select it with `testing_with :my_browser`. Helpers are
-initialized when first used. `on_teardown` callbacks run in reverse order, after
-each test for `helper` resources and after the test run for `global_helper`
-resources. A test helper can depend on a global helper, but a global helper
-cannot depend on a test helper.
+initialized when first used. Use `on_teardown` to clean each resource up; the
+callback runs after each test for a `helper` and after the test run for a
+`global_helper`. A test helper can depend on a global helper, but a global
+helper cannot depend on a test helper.
 
 Test Helpers
 ------------

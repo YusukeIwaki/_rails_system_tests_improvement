@@ -20,15 +20,15 @@ module ActionDispatch
     # Each dependency resolves to another helper of the same name, or to the
     # running server's +base_url+:
     #
-    #     class BrowserAdapter < ActionDispatch::SystemTesting::TestAdapter
+    #     class MyBrowserAdapter < ActionDispatch::SystemTesting::TestAdapter
     #       global_helper :browser do
     #         browser = Browser.launch
     #         on_teardown { browser.close }
     #         browser
     #       end
     #
-    #       helper :page do |browser:|
-    #         page = browser.new_page
+    #       helper :page do |browser:, base_url:|
+    #         page = browser.new_page(base_url: base_url)
     #         on_teardown { page.close }
     #         page
     #       end
@@ -37,11 +37,11 @@ module ActionDispatch
     # Register the adapter under a name so applications can select it with
     # +testing_with+:
     #
-    #     ActionDispatch::SystemTesting::TestAdapters.register(:my_browser, BrowserAdapter)
+    #     ActionDispatch::SystemTesting::TestAdapters.register(:my_browser, MyBrowserAdapter)
     #
-    # Helpers are built lazily the first time a test reads them. +on_teardown+
-    # registers a cleanup callback; callbacks run in reverse order, after the
-    # test for regular helpers and after the run for global helpers.
+    # Helpers are built lazily the first time a test reads them. Use
+    # +on_teardown+ to clean the resource up: the callback runs after the test
+    # for a regular helper, or after the run for a global helper.
     class TestAdapter
       # A single helper definition: its name, whether it is global (built once
       # per run) or not (built once per test), and the block that builds its
