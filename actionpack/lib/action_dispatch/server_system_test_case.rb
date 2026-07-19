@@ -12,35 +12,28 @@ require "action_dispatch/system_testing/url_helpers_proxy"
 module ActionDispatch
   # # Server System Testing
   #
-  # `ActionDispatch::ServerSystemTestCase` boots your Rails application as a
-  # real server for system testing. It does not depend on Capybara.
+  # System tests run your application as a real server so you can interact with
+  # it in the browser. `ActionDispatch::ServerSystemTestCase` lets you do that
+  # with any browser automation tool -- Playwright, Ferrum, or your own --
+  # instead of Capybara.
   #
-  # It is responsible only for the part of system testing that genuinely belongs
-  # to Rails: booting the application as a real Rack server, binding it to a
-  # host/port, waiting until it is actually serving requests, exposing the base
-  # URL it is reachable on, and tearing it down at the end of the run. URL
-  # helpers (`root_url`, `users_path`, ...) are generated against that running
-  # server, so the host they produce points at the live application.
+  # It boots your application on a real port, waits until it is serving
+  # requests, and gives you the URL it is running on through `base_url`. URL
+  # helpers (`root_url`, `users_path`, ...) point at that running server.
+  # Interacting with the page is up to the adapter you select.
   #
-  # Everything above that -- driving a browser, filling in forms, asserting on
-  # the page, taking screenshots -- is left to the test author or to a browser
-  # automation tool of their choice (Capybara, Playwright, Ferrum, ...).
-  # `ActionDispatch::SystemTestCase` provides the familiar Capybara-based
-  # experience separately, while sharing the same URL helper behavior.
-  #
-  # Configure how the application is served, and select a browser adapter in
-  # your `ApplicationSystemTestCase`, so that individual tests stay focused on
-  # the interaction being tested. `served_by` is optional -- by default the
-  # server binds to an available port on `0.0.0.0`. For example, with Playwright:
+  # Extend your `ApplicationSystemTestCase` from it and pick an adapter with
+  # `testing_with`. `served_by` is optional -- by default the server binds to an
+  # available port on `0.0.0.0`:
   #
   #     require "test_helper"
+  #
   #     class ApplicationSystemTestCase < ActionDispatch::ServerSystemTestCase
   #       testing_with :playwright
   #     end
   #
-  # Individual tests then only drive the page. URL helpers (`root_url`,
-  # `new_user_url`, ...) are generated against the running server, so they point
-  # at the live application:
+  # Your tests then interact with the page. URL helpers point at the running
+  # server, so they reach the live application:
   #
   #     require "application_system_test_case"
   #
@@ -55,21 +48,21 @@ module ActionDispatch
   #       end
   #     end
   #
-  # Browser libraries can provide their own system test adapter without
-  # translating their native browser API into a common driver API.
+  # A browser library can ship its own adapter, so you interact with the page
+  # through its native API instead of a shared driver API.
   #
-  # Because the running server is reachable over plain HTTP, a test does not even
-  # need a browser. `base_url` (aliased as `app_host`) points at the live
-  # application, so an HTTP client such as Faraday can drive it directly:
+  # You don't even need a browser. `base_url` (aliased as `app_host`) points at
+  # the running application, so an HTTP client such as Faraday can interact with
+  # it directly:
   #
   #     class ApplicationSystemTestCase < ActionDispatch::ServerSystemTestCase
   #       setup { @client = Faraday.new(url: base_url) }
   #     end
   #
-  # and using `@client` in tests (`@client.get("/up")`, ...).
+  # You then use `@client` in your tests (`@client.get("/up")`, ...).
   #
-  # The application server is booted before each system test starts. The first
-  # test in the process starts the shared test session; later tests reuse it.
+  # The server boots before each system test. The first test in the process
+  # starts the shared session; later tests reuse it.
   class ServerSystemTestCase < ActiveSupport::TestCase
     include SystemTesting::UrlHelpersProxy
 

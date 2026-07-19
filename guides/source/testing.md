@@ -1748,15 +1748,14 @@ such as commenting, deleting articles, publishing draft articles, etc.
 
 System tests are driven by Capybara by default.
 [`ActionDispatch::ServerSystemTestCase`](https://api.rubyonrails.org/classes/ActionDispatch/ServerSystemTestCase.html)
-boots your Rails application as a real server for system testing without
-depending on Capybara. It takes care of only the part that belongs to Rails:
-booting your application as a real server, waiting until it is actually serving
-requests, exposing the URL it is reachable on, and shutting it down at the end
-of the run. Everything above that -- driving a browser, filling in forms, making
-assertions -- is left to a tool of your choice.
+lets you interact with your application in the browser using any browser tool,
+not just Capybara. It boots your application as a real server, waits until it is
+serving requests, and exposes the URL it is running on through `base_url`. You
+choose how to interact with the browser by selecting an adapter with
+`testing_with`.
 
-This is useful when you drive the browser with a tool that does not go through
-Capybara, such as [Ferrum](https://github.com/rubycdp/ferrum) or
+This is useful when your browser tool does not go through Capybara, such as
+[Ferrum](https://github.com/rubycdp/ferrum) or
 [Playwright](https://github.com/YusukeIwaki/playwright-ruby-client).
 
 To use it, inherit from `ActionDispatch::ServerSystemTestCase` in

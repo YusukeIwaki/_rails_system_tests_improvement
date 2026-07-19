@@ -4,18 +4,20 @@ module ActionDispatch
   module SystemTesting
     # = System Testing \Test Adapter
     #
-    # Base class for adapters that expose browser objects -- or any other
-    # per-test or per-run resource -- to ActionDispatch::ServerSystemTestCase.
+    # Subclass +TestAdapter+ to let a browser tool work with
+    # ActionDispatch::ServerSystemTestCase. An adapter hands each test the
+    # objects it interacts with the page through -- typically a browser and a
+    # page, but it can provide any per-test or per-run resource.
     #
-    # An adapter declares the resources it provides as _helpers_. A helper is
-    # defined with a block that builds the resource; the block's return value is
-    # what tests get back. Helpers come in two flavors:
+    # Declare each resource as a _helper_. A helper is defined with a block that
+    # builds the resource and returns it; a test reads it by calling a method of
+    # the same name. Helpers come in two kinds:
     #
-    # * A global helper is built at most once per test run.
-    # * A (regular) helper is built at most once per test.
+    # * A global helper is built at most once per run.
+    # * A regular helper is built at most once per test.
     #
     # A helper block declares its dependencies as required keyword arguments.
-    # Each dependency is resolved to another helper of the same name, or to the
+    # Each dependency resolves to another helper of the same name, or to the
     # running server's +base_url+:
     #
     #     class BrowserAdapter < ActionDispatch::SystemTesting::TestAdapter
@@ -31,6 +33,11 @@ module ActionDispatch
     #         page
     #       end
     #     end
+    #
+    # Register the adapter under a name so applications can select it with
+    # +testing_with+:
+    #
+    #     ActionDispatch::SystemTesting::TestAdapters.register(:my_browser, BrowserAdapter)
     #
     # Helpers are built lazily the first time a test reads them. +on_teardown+
     # registers a cleanup callback; callbacks run in reverse order, after the
