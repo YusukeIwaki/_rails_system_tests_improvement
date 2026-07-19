@@ -114,6 +114,21 @@ class ServerSystemTestCaseTest < ActiveSupport::TestCase
     end
   end
 
+  test "works without an adapter by interacting with the server through base_url" do
+    with_test_session do
+      klass = new_test_case
+      klass.served_by host: "127.0.0.1", port: 0
+      instance = klass.new("test_something")
+
+      instance.send(:before_setup)
+      response = Net::HTTP.get_response(URI("#{instance.base_url}/"))
+      instance.send(:after_teardown)
+
+      assert_equal "200", response.code
+      assert_equal "ok", response.body
+    end
+  end
+
   test "before_setup clears previous server errors" do
     with_test_session do |session|
       klass = new_test_case
