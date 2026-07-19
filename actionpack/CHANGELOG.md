@@ -8,22 +8,12 @@
     *Étienne Barrié*
 
 *   Introduce `ActionDispatch::ServerSystemTestCase`, a base class for system
-    tests that boots the Rails application as a real server without depending on
+    tests that boots the application as a real server without depending on
     Capybara.
 
-    It exposes the running application's base URL through `app_host` and
-    generates URL helpers (`root_url`, `users_path`, ...) against it, so browser
-    automation tools other than Capybara (Playwright, Ferrum, plain `Net::HTTP`,
-    ...) can drive a real Rails server. It also supports a separate bind host
-    and browser-facing app host, and reraises server-side application errors
-    during teardown.
-
-    Browser libraries can provide a `SystemTesting::TestAdapter` selected with
-    `testing_with`. Adapters declare run-scoped resources with `global_helper`
-    and test-scoped resources with `helper`, including their dependencies and
-    teardown callbacks. The built-in Playwright and Ferrum adapters make
-    `browser`, `browser_context`, and `page` available with
-    `testing_with :playwright` or `testing_with :ferrum`.
+    It only boots the server and exposes its `base_url`, generating URL helpers
+    against it. You are then free to interact with the application using any
+    browser automation tool, such as Playwright or Ferrum.
     `ActionDispatch::SystemTestCase` remains the Capybara-based default.
 
     *YusukeIwaki*
