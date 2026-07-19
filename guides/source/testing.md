@@ -1782,14 +1782,12 @@ select a browser adapter with `testing_with` and interact with the page through
 that tool's native API. The server binds to an available port on `0.0.0.0` by
 default, so you usually don't need to configure it.
 
-Adapters for browser tools such as Playwright and Ferrum are provided as
-separate libraries, each registered under a name you pass to `testing_with`.
+Rails ships adapters for Playwright and Ferrum.
 
 #### Playwright
 
-The Playwright adapter is distributed as a separate library and requires the
-`playwright-ruby-client` gem and the Playwright npm package. Once it is loaded,
-select it with `testing_with`:
+The Playwright adapter requires the `playwright-ruby-client` gem and the
+Playwright npm package. Select it with `testing_with`:
 
 ```ruby
 require "test_helper"
@@ -1841,9 +1839,8 @@ connect to a Playwright browser server, set `PLAYWRIGHT_WS_ENDPOINT` or pass
 
 #### Ferrum
 
-The Ferrum adapter is distributed as a separate library and requires the
-`ferrum` gem and Chrome or Chromium. Once it is loaded, select it with
-`testing_with`:
+The Ferrum adapter requires the `ferrum` gem and Chrome or Chromium. Select it
+with `testing_with`:
 
 ```ruby
 require "test_helper"

@@ -42,3 +42,16 @@ module ActionDispatch
     end
   end
 end
+
+require "action_dispatch/system_testing/test_adapters/ferrum_adapter"
+require "action_dispatch/system_testing/test_adapters/playwright_adapter"
+
+ActionDispatch::SystemTesting::TestAdapters.register(
+  :ferrum,
+  ActionDispatch::SystemTesting::TestAdapters::FerrumAdapter,
+)
+
+ActionDispatch::SystemTesting::TestAdapters.register(
+  :playwright,
+  ActionDispatch::SystemTesting::TestAdapters::PlaywrightAdapter,
+)

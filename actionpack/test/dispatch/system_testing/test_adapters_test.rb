@@ -14,6 +14,13 @@ class TestAdaptersTest < ActiveSupport::TestCase
     assert_same ExampleAdapter, ActionDispatch::SystemTesting::TestAdapters.lookup("lookup_example")
   end
 
+  test "lookup includes the built-in browser adapters" do
+    assert_same ActionDispatch::SystemTesting::TestAdapters::FerrumAdapter,
+      ActionDispatch::SystemTesting::TestAdapters.lookup(:ferrum)
+    assert_same ActionDispatch::SystemTesting::TestAdapters::PlaywrightAdapter,
+      ActionDispatch::SystemTesting::TestAdapters.lookup(:playwright)
+  end
+
   test "lookup rejects names that are not strings or symbols" do
     error = assert_raises(ArgumentError) do
       ActionDispatch::SystemTesting::TestAdapters.lookup(ExampleAdapter)
